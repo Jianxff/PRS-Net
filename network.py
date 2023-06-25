@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch import tensor
 import numpy as np
 
 class PRSNet(nn.Module):

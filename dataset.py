@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import scipy.io as sio
+from polygon import Polygon
 import os
 
 class ShapeNetData(Dataset):
@@ -14,22 +15,10 @@ class ShapeNetData(Dataset):
 
   def __getitem__(self, index):
     mat_path = self.data_paths[index]
-    # load data from matlab file
-    mat_data = sio.loadmat(mat_path) 
-    # filter dataset
-    voxel = mat_data['Volume']
-    sample = mat_data['surfaceSamples']
-    closest = mat_data['closestPoints']
-
-    return {
-      'voxel': torch.from_numpy(voxel).float(),
-      'sample': torch.from_numpy(sample).float().t(),
-      'closest': torch.from_numpy(closest).float().reshape(-1, 3)
-    }
+    return Polygon.load(mat_path)
   
   def __len__(self):
     return len(self.data_paths)
-  
 
 class ShapeNetLoader():
   def __init__(self, dataset_dir):
