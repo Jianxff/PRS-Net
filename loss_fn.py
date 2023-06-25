@@ -84,8 +84,8 @@ class RegularLoss(torch.nn.Module):
 class LossFn(torch.nn.Module):
   def __init__(self, weight: float):
     self.weight = weight
-    self.sym_loss = SymmetryLoss()
-    self.reg_loss = RegularLoss()
+    self.sym_loss = SymmetryLoss
+    self.reg_loss = RegularLoss
 
   def forward(self, polygon: Polygon, planes, axes):
     sym_loss = self.sym_loss(polygon,planes, axes)

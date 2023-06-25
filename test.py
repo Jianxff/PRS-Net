@@ -1,6 +1,5 @@
 
-import torch.tensor as tensor
-
+import torch
 # a = torch.tensor([[1,2,3],[2,3,4],[4,5,6]])
 # z = torch.zeros(a.shape[0],1)
 # print('a',a)
@@ -11,6 +10,7 @@ import torch.tensor as tensor
 # b = torch.cat((torch.zeros(a.shape[0],1), a), dim=1)
 # print(b)
 
-quat = tensor([1,2,3,4])
-quat_inv = quat * tensor([1,-1,-1,-1])
-print(quat_inv)
+a = torch.Tensor([0,0,0])
+b = torch.Tensor([]).reshape(-1,3)
+c = torch.stack((a,b),dim=0)
+print(c)
