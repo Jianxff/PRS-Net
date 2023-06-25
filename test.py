@@ -10,7 +10,11 @@ import torch
 # b = torch.cat((torch.zeros(a.shape[0],1), a), dim=1)
 # print(b)
 
-a = torch.Tensor([0,0,0])
-b = torch.Tensor([]).reshape(-1,3)
+# a = torch.Tensor([0,0,0])
+# b = torch.Tensor([]).reshape(-1,3)
+# c = torch.stack((a,b),dim=0)
+# print(c)
+a = torch.Tensor([1,2,3])
+b = torch.Tensor([4,5,6])
 c = torch.stack((a,b),dim=0)
 print(c)

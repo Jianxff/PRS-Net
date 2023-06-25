@@ -4,7 +4,6 @@ from network import PRSNet
 from loss_fn import LossFn
 import time
 
-
 prs_net = PRSNet()
 loss_fn = LossFn(weight=25)
 data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2-PT')
@@ -19,8 +18,7 @@ for epoch in range(n_iter):
   epoch_tm = time.time()
   for i, data in enumerate(dataset):
     iter_tm = time.time()
-
-    planes, axes = prs_net(data.voxel_grid.voxles)
+    planes, axes = prs_net(data['voxel_grid'])
     loss = loss_fn(data,planes,axes)
     
     optimizer.zero_grad()

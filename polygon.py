@@ -110,8 +110,6 @@ class Polygon:
   def __init__(self, grid_size=32, polygon_bound = 0.5):
     self.grid_size = grid_size
     self.bound = polygon_bound
-    self.voxel_grid = VoxelGrid(grid_size)
-    self.closest_points = np.array([])
   
   def voxel(self):
     return self.voxel_grid.voxels
@@ -132,6 +130,7 @@ class Polygon:
     return (data + self.bound) * self.grid_size
 
   def voxelize(self):
+    self.voxel_grid = VoxelGrid(self.grid_size)
     print('voxelizing...')
     vtx = (self.vertices + self.bound) * self.grid_size
     trg = self.triangles
@@ -182,15 +181,4 @@ class Polygon:
     }
     sio.savemat(path, data)
     np.save(path + '.npy', self.voxel_grid.voxels)
-
-  @staticmethod
-  def load(path):
-    data = sio.loadmat(path)
-    p = Polygon(data['grid_size'], data['bound'])
-    p.voxel_grid.voxels = data['voxel_grid']
-    p.sample_points = data['sample_points']
-    p.closest_points = data['closest_points']
-    # p.vertices = data['vertices']
-    # p.triangles = data['triangles']
-    return p
 

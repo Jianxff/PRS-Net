@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch import tensor
 import numpy as np
 
 class PRSNet(nn.Module):
@@ -27,11 +26,18 @@ class PRSNet(nn.Module):
     v_conved = self.conv3d(voxel).flatten()
 
     # linear calculate
-    planes = []
-    axes = []
-    for i in range(3):
-      planes.append(self.linear_reflect[i](v_conved))
-      axes.append(self.linear_rotate[i](v_conved))
+    planes = torch.stack((self.linear_reflect[0](v_conved),
+                          self.linear_reflect[1](v_conved),
+                          self.linear_reflect[2](v_conved)),dim=0)
+    axes = torch.stack((self.linear_rotate[0](v_conved),
+                        self.linear_rotate[1](v_conved),
+                        self.linear_rotate[2](v_conved)),dim=0)
+    # axes = torch.Tensor([])
+    # for i in range(3):
+    #   planes = torch.cat((planes, self.linear_reflect[i](v_conved)),dim=1)
+    #   axes = torch.cat((axes, self.linear_rotate[i](v_conved)),dim=1)
+
+      # axes.append(self.linear_rotate[i](v_conved))
     return planes, axes
 
 
