@@ -4,13 +4,14 @@ from network import PRSNet
 from loss_fn import LossFn
 import time
 
+batch_size = 32
+n_iter = 30
+
 prs_net = PRSNet()
 loss_fn = LossFn(weight=25)
-data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2-PT')
+data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2-PT',batch_size)
 dataset = data_loader.dataset()
 
-batch_size = 32
-n_iter = 1
 
 optimizer = torch.optim.Adam(prs_net.parameters(), lr=0.001)
 
@@ -28,3 +29,4 @@ for epoch in range(n_iter):
     print(f'epoch: {epoch}, iter: {i}, loss: {loss}, time: {time.time() - iter_tm}')
 
   prs_net.save(f'epoch_{epoch}')
+prs_net.save('latest')

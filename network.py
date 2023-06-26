@@ -23,7 +23,8 @@ class PRSNet(nn.Module):
 
   def forward(self, voxel):
     # convolution 3d 
-    v_conved = self.conv3d(voxel).flatten()
+    v_conved = self.conv3d(voxel)
+    v_conved = v_conved.reshape(v_conved.size(0),-1)
 
     # linear calculate
     planes = torch.stack((self.linear_reflect[0](v_conved),

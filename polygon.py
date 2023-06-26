@@ -1,9 +1,13 @@
 import numpy as np
-import open3d as o3d
 import torch
 import scipy.io as sio
+from scipy.spatial.transform import Rotation
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
+# import open3d as o3d
+# o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Error)
+import trimesh
 
 class Surface:
   data: torch.Tensor
@@ -64,7 +68,7 @@ class VoxelGrid:
   def fill_iter(self, surface: Surface, limit = 1):
     s_ready, s_wait = Surface(), surface
     while(s_wait.valid()):
-      print(f'waiting: {s_wait.data.shape[0]}')
+      # print(f'waiting: {s_wait.data.shape[0]}')
       if s_wait.data.shape[0] < 1000000:
         for i in range(5):
           if s_wait.valid():
@@ -114,59 +118,64 @@ class Polygon:
   def voxel(self):
     return self.voxel_grid.voxels
 
-  def load_model(self, path):
+  def load_model(self, path, rand_rotate = False):
     # load data
     try:
-      mesh = o3d.io.read_triangle_mesh(path)
+      mesh = trimesh.load(path, force='mesh')
+      # mesh = o3d.io.read_triangle_mesh(path)
       self.vertices = np.asarray(mesh.vertices)
-      self.triangles = np.asarray(mesh.triangles,dtype=int)
-      self.sample_points = np.asarray(mesh.sample_points_uniformly(number_of_points=1000).points)
+      self.triangles = np.asarray(mesh.faces,dtype=int)
+      sample, _ = trimesh.sample.sample_surface(mesh, 1000)
+      self.sample_points = np.asarray(sample)
+      if self.sample_points.shape[0] != 1000:
+        return False
+      if rand_rotate:
+        R = Rotation.random().as_matrix()
+        self.vertices = (np.matmul(R, self.vertices.transpose())).transpose()
+        self.sample_points = (np.matmul(R, self.sample_points.transpose())).transpose()
       return True
-    except:
-      print("load error")
+    except Exception as e:
+      print(e)
       return False
-  
-  def scale(self, data):
-    return (data + self.bound) * self.grid_size
 
   def voxelize(self):
     self.voxel_grid = VoxelGrid(self.grid_size)
-    print('voxelizing...')
+    # print('voxelizing...')
     vtx = (self.vertices + self.bound) * self.grid_size
     trg = self.triangles
     # pre-processing
-    print(f'vertices: {len(vtx)}, triangles: {len(trg)}')
+    # print(f'vertices: {len(vtx)}, triangles: {len(trg)}')
     s_points = np.stack([vtx[trg[:,0]], vtx[trg[:,1]], vtx[trg[:,2]]], axis=1)
-    self.voxel_grid.fill(Surface(torch.Tensor(s_points)))
-    print('voxelization finished')
+    surface = Surface(torch.Tensor(s_points))
+    self.voxel_grid.fill(surface)
+    # print('voxelization finished')
     return self.voxel_grid.voxels
 
   def compute_closests(self):
-    print('computing closest points')
+    # print('computing closest points')
     # compute center cube
     seg = 1 / self.grid_size
-    col = np.arange(-self.bound + seg / 2 , self.bound - seg /2 + seg, seg)
+    col = np.arange(-self.bound + seg / 2 , self.bound + seg / 2, seg)
     x, y, z = np.meshgrid(col, col, col)
-    center_cube = self.scale(np.stack([x, y, z], axis=3))
+    center_cube = np.stack([x, y, z], axis=3)
     # init closest points
-    cp = torch.Tensor([])
+    self.closest_points = torch.Tensor(32,32,32,3)
     # compute closest points
-    vertices = torch.Tensor(self.vertices)
-    cube = torch.Tensor(center_cube)
-    cube = cube.reshape(-1,1024,3)
-    cnt = 0
+    vertices = torch.cat([torch.Tensor(self.vertices), torch.Tensor(self.sample_points)], dim=0)
+    cube = torch.Tensor(center_cube).reshape(-1,self.grid_size**2, 3)
+
+
     for k in cube:
-      cnt += 1
-      # print(f'waiting: {32 - cnt}')
       diff = vertices - k[:, np.newaxis]
       dist = torch.norm(diff, dim=2)
-      k_cp_index = torch.argmin(dist, dim=1)
+      k_cp_index = torch.Tensor(torch.argmin(dist, dim=1))
       k_cp = vertices[k_cp_index]
-      cp = torch.cat([cp, k_cp],dim=0)
+      k = torch.floor((k + self.bound) * self.grid_size).int()
+      self.closest_points[k[:,0], k[:,1], k[:,2]] = torch.Tensor(k_cp[:,])
 
-    cp = cp.cpu().numpy()
-    self.closest_points = cp.reshape(self.grid_size, self.grid_size, self.grid_size, 3)
-    print('computation finished')
+    self.closest_points = self.closest_points.cpu().numpy()
+
+
 
   def dump(self, path):
     # save to mat:
@@ -180,5 +189,5 @@ class Polygon:
       'closest_points': self.closest_points
     }
     sio.savemat(path, data)
-    np.save(path + '.npy', self.voxel_grid.voxels)
+    # np.save(path + '.npy', self.voxel_grid.voxels)
 

@@ -5,30 +5,19 @@ import numpy as np
 class DistCount(torch.autograd.Function):
   @staticmethod
   def forward(ctx, points: Tensor, polygon: dict, weight: float = 1):
-    # idx = np.floor(points  + bias).astype(int)
-    # idx = np.where((idx >= 0) & (idx < self.size), idx, self.size)
-    bound = polygon['bound']
-    grid_size = int(polygon['grid_size'])
-    closest_points = polygon['closest_points'].reshape(grid_size,grid_size,grid_size,3)
+    bound, grid_size = polygon['bound'][0], polygon['grid_size'][0]
+    closest_points = polygon['closest_points'].reshape(-1,grid_size,grid_size,grid_size,3)
     # voxel_grid = polygon['voxel_grid'].reshape(grid_size,grid_size,grid_size)
-    
+
     indices = torch.floor((points + bound) * grid_size).long()
     indices = torch.clamp(indices, min=0, max=grid_size-1)
-    # flag = (0 <= indices[:,0] < grid_size) | (0 <= indices[:,1] < grid_size) | (0 <= indices[:,2] < grid_size)
-    # flag = ((indices[:,0] >= 0) & (indices[:,0] < grid_size)) & ((indices[:,1] >= 0) & (indices[:,1] < grid_size)) & ((indices[:,2] >= 0) & (indices[:,2] < grid_size))
-    # indices = indices[flag]
-    closest = closest_points[indices[:,0], indices[:,1], indices[:,2]]
-    # points = points[flag]
+    closest = torch.Tensor([])
 
+    for batch in range(points.shape[0]):
+      cp, idx  = closest_points[batch,:], indices[batch,:]
+      clp = cp[idx[:,0], idx[:,1], idx[:,2]].unsqueeze(0)
+      closest = torch.cat((closest, clp), dim=0)
     dist = points - closest
-    # exceed = points.shape[0] - indices.shape[0]
-    # dist = torch.stack()
-
-    # mask = voxel_grid[indices[:,0], indices[:,1], indices[:,2]]
-    # print(mask.shape)
-    # mask.reshape(-1,1)
-    # dist = dist * mask
-
     ctx.constant = weight
     ctx.save_for_backward(dist)
     norm_dist = torch.norm(dist, dim=1)
@@ -50,20 +39,24 @@ class SymmetryLoss(torch.nn.Module):
   def acc_reflect(self, plane: Tensor, polygon: dict):
     # reflect
     points = polygon['sample_points']
-    a,b,c,d = plane
-    n = torch.Tensor([a,b,c]).reshape(3,1)
-    points = points.reshape(-1,3)
-    points_t = points - 2 * (torch.matmul(points,n) + d) / (torch.norm(n)**2) * n.reshape(1,3)
+    plane = plane.unsqueeze(1)
+    n = plane[:,:,:-1]
+    d = plane[:,:,3]
+    
+    dst = 2 * (torch.sum(points * n, dim=2) + d) / (torch.norm(n, dim=2)**2)
+    dst = dst.unsqueeze(2)
+    points_t = points - dst * n
     self.reflect_loss += DistCount.apply(points_t, polygon)
 
   def acc_rotate(self, quat: Tensor, polygon: dict):
     # complete 0 before sample
-    points = polygon['sample_points'].reshape(-1,3)
-    points = torch.cat((torch.zeros(points.shape[0],1), points), dim=1)
+    points = polygon['sample_points']
+    points = torch.cat((torch.zeros(points.shape[0],points.shape[1],1), points), dim=2)
     # rotate
-    quat_inv = quat * torch.tensor([1,-1,-1,-1])
-    points_t = quat * points * quat_inv
-    points_t = points_t[:,1:]
+    quat_u = quat.unsqueeze(1)
+    quat_inv = quat_u * torch.tensor([1,-1,-1,-1])
+    points_t = quat_u * points * quat_inv
+    points_t = points_t[:,:,1:]
     self.rotate_loss += DistCount.apply(points_t, polygon)
 
 
@@ -81,20 +74,27 @@ class RegularLoss(torch.nn.Module):
   def __init__(self):
     super(RegularLoss, self).__init__()
 
+  def acc_transpose(self,data:torch.Tensor):
+    out = torch.Tensor([])
+    for d in data:
+      d = d.unsqueeze(1)
+      out = torch.cat((out,d), dim=1)
+    return out
+
+
   def __call__(self, planes, axes):
-    n_vec = planes[:,:-1]
-    n_vec = n_vec / torch.norm(n_vec, dim=1)
+    planes, axes = self.acc_transpose(planes), self.acc_transpose(axes)
+    n_vec = planes[:,:,:-1]
+    n_vec = n_vec / torch.norm(n_vec, dim=2).unsqueeze(2)
     M1 = n_vec
-    M1_T = torch.transpose(M1,0,1)
+    M1_T = torch.transpose(M1,1,2)
 
-    u_vec = axes[:,1:]
+    u_vec = axes[:,:,1:]
     M2 = u_vec
-    M2_T = torch.transpose(M2,0,1)
-
-    A = torch.matmul(M1, M1_T) - torch.eye(3)
-    B = torch.matmul(M2, M2_T) - torch.eye(3)
-
-    loss = torch.norm(A) + torch.norm(B)
+    M2_T = torch.transpose(M2,1,2)
+    A = torch.matmul(M1[:,], M1_T[:,]) - torch.eye(3).unsqueeze(0)
+    B = torch.matmul(M2[:,], M2_T[:,]) - torch.eye(3).unsqueeze(0)
+    loss = torch.mean(torch.norm(A, dim=1) + torch.norm(B, dim=1))
     return loss
 
 
