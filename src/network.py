@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class PRSNet(nn.Module):
   def __init__(self):
@@ -13,33 +12,33 @@ class PRSNet(nn.Module):
     self.linear_rotate = []
 
     # linear 
-    bias_reflect = [[1,0,0,0],[0,1,0,0],[0,0,1,0]]
-    bias_rotate = [[0,0,0,np.sin(np.pi/2)], [0,0,np.sin(np.pi/2),0], [0,np.sin(np.pi/2),0,0]]
+    bias_reflect = [[1.,0,0,0],[0,1.,0,0],[0,0,1.,0]]
+    bias_rotate = [[0,1.,0,0], [0,0,1.,0], [0,0,0,1.]]
     for i in range(3):
       # symmetry reflection
-      self.linear_reflect.append(self.linear_layer(bias_reflect[i]))
+      self.__setattr__(f'linear_plane_{i}', self.linear_layer(bias_reflect[i],clear_weight=True).to(device))
+      # self.linear_reflect.append(self.linear_layer(bias_reflect[i]).to(device))
       # symmetry rotation
-      self.linear_rotate.append(self.linear_layer(bias_rotate[i]))
+      self.__setattr__(f'linear_axis_{i}', self.linear_layer(bias_rotate[i]).to(device))
+      # self.linear_rotate.append(self.linear_layer(bias_rotate[i]).to(device))
 
 
   def forward(self, voxel):
     # convolution 3d 
     v_conved = self.conv3d(voxel)
-    v_conved = v_conved.reshape(v_conved.size(0),-1)
+    v_conved = v_conved.reshape(v_conved.size(0),-1).to(device)
 
     # linear calculate
-    planes = torch.stack((self.linear_reflect[0](v_conved),
-                          self.linear_reflect[1](v_conved),
-                          self.linear_reflect[2](v_conved)),dim=0)
-    axes = torch.stack((self.linear_rotate[0](v_conved),
-                        self.linear_rotate[1](v_conved),
-                        self.linear_rotate[2](v_conved)),dim=0)
-    # axes = torch.Tensor([])
-    # for i in range(3):
-    #   planes = torch.cat((planes, self.linear_reflect[i](v_conved)),dim=1)
-    #   axes = torch.cat((axes, self.linear_rotate[i](v_conved)),dim=1)
+    planes = []
+    axes = []
+    for i in range(3):
+      plane = self.__getattr__(f'linear_plane_{i}')(v_conved)
+      plane = plane / (1e-12 + torch.norm(plane[:,:3], dim=1).unsqueeze(1))
+      planes.append(plane)
+      axis = self.__getattr__(f'linear_axis_{i}')(v_conved)
+      axis = axis / (1e-12 + torch.norm(axis[:,:], dim=1).unsqueeze(1))
+      axes.append(axis)
 
-      # axes.append(self.linear_rotate[i](v_conved))
     return planes, axes
 
 
@@ -79,7 +78,7 @@ class PRSNet(nn.Module):
   
   def save_network(self, label):
     path = f'../checkpoint/prs_net_{label}.pth'
-    torch.save(self.cpu().state_dict(), path)
+    torch.save(self.state_dict(), path)
 
   def load_network(self, label):
     path = f'../checkpoint/prs_net_{label}.pth'

@@ -3,8 +3,6 @@ import torch
 import scipy.io as sio
 from scipy.spatial.transform import Rotation
 
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
 # import open3d as o3d
 # o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Error)
 import trimesh

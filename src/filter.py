@@ -50,7 +50,7 @@ class ShapeNetIndex:
 
 dataset_path = '/root/autodl-tmp/ShapeNetCore.v2'
 shapenet = ShapeNetIndex(index_dir='/root/autodl-tmp',
-                         result_dir='/root/autodl-tmp/ShapeNetCore.v2-RS')
+                         result_dir='/root/autodl-tmp/ShapeNetCore.v2-PT')
 shapenet.filter(dataset_path)
-shapenet.split(test_proportion=0.1)
+shapenet.split(test_proportion=0.2)
 shapenet.dump()
