@@ -100,6 +100,7 @@ class VoxelGrid:
 
 
 class Polygon:
+  id: str
   # original data
   bound: float
   vertices: np.ndarray
@@ -111,7 +112,8 @@ class Polygon:
   # closest points
   closest_points: np.ndarray
 
-  def __init__(self, grid_size=32, polygon_bound = 0.5):
+  def __init__(self, id='polygon', grid_size=32, polygon_bound = 0.5):
+    self.id = id
     self.grid_size = grid_size
     self.bound = polygon_bound
   
@@ -191,3 +193,9 @@ class Polygon:
     sio.savemat(path, data)
     # np.save(path + '.npy', self.voxel_grid.voxels)
 
+  def process(self, path, rand_rotate = False):
+    if not self.load_model(path, rand_rotate):
+      return False
+    self.voxelize()
+    self.compute_closests()
+    return True

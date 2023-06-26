@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 class PRSNet(nn.Module):
   def __init__(self):
@@ -76,12 +77,12 @@ class PRSNet(nn.Module):
     model += [out]
     return nn.Sequential(*model)
   
-  def save(self, label):
-    path = f'./checkpoint/prs_net_{label}.pth'
+  def save_network(self, label):
+    path = f'../checkpoint/prs_net_{label}.pth'
     torch.save(self.cpu().state_dict(), path)
 
-  def load(self, label):
-    path = f'./checkpoint/prs_net_{label}.pth'
+  def load_network(self, label):
+    path = f'../checkpoint/prs_net_{label}.pth'
     self.load_state_dict(torch.load(path))
 
     
