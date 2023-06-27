@@ -7,7 +7,7 @@ Implementation for PRS-Net: Planar Reflective Symmetry Detection Net for 3D Mode
 
 - filter dataset and set proportion for spliting train and test
   ``` bash
-  python pretreat/filter.py
+  python utils/filter.py
   ```
 
 - pre-processing original `ShapeNetCore.v2` dataset, including voxelization and compute closest points
