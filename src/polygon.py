@@ -2,12 +2,20 @@ import numpy as np
 import torch
 import scipy.io as sio
 from scipy.spatial.transform import Rotation
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # import open3d as o3d
 # o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Error)
 import trimesh
 
 class Surface:
+  r""" Surface data structure for voxel grid
+
+  三角平面
+  .. note:
+    - dist: 三角距离计算
+    - filter/split: 三角平面分割
+  """
   data: torch.Tensor
   def __init__(self, data: torch.Tensor = torch.Tensor([])):
     self.data = data
@@ -52,6 +60,13 @@ class Surface:
     
 
 class VoxelGrid:
+  r""" Voxel grid data structure
+
+  体素网格
+  .. note:
+    - index3d: 三维索引 p(x,y,z) -> [(p + Bound) * GridSize]
+    - fill: 三角面填充
+  """
   size: int
   voxels: np.ndarray
   def __init__(self, grid_size):
@@ -66,13 +81,13 @@ class VoxelGrid:
   def fill_iter(self, surface: Surface, limit = 1):
     s_ready, s_wait = Surface(), surface
     while(s_wait.valid()):
-      # print(f'waiting: {s_wait.data.shape[0]}')
+      # split while trianlge number < 1000000
       if s_wait.data.shape[0] < 1000000:
+        # 5 times split
         for i in range(5):
           if s_wait.valid():
             s1, s2 = s_wait.filter(limit)
-            s_ready = s_ready + s1
-            s_wait = s2
+            s_ready, s_wait = s_ready + s1, s2
           else:
             break
       else:
@@ -81,8 +96,12 @@ class VoxelGrid:
       self.padding(s_ready)
       s_ready = Surface()
 
-
   def fill(self, surface: Surface, limit = 1, iter = True):
+    r""" Fill voxel grid with surface
+
+    体素网格填充
+    中间处理: 增加1个padding边界
+    """
     self.voxels = np.pad(self.voxels, ((0,1),(0,1),(0,1)), 'constant', constant_values=False)
     if not iter:
       self.padding(surface)
@@ -98,6 +117,19 @@ class VoxelGrid:
 
 
 class Polygon:
+  r""" Polygon data structure
+
+  多面体
+  .. note:
+    - id: 多面体id
+    - bound: 模型边界
+    - grid_size: 体素网格大小
+    - vertices: 顶点
+    - triangles: 三角面
+    - sample_points: 采样点(1000 samples)
+    - voxel_grid: 体素网格
+    - closest_points: 最近点
+  """
   id: str
   # original data
   bound: float
@@ -114,12 +146,14 @@ class Polygon:
     self.id = id
     self.grid_size = grid_size
     self.bound = polygon_bound
-  
-  def voxel(self):
-    return self.voxel_grid.voxels
 
   def load_model(self, path, rand_rotate = False):
-    # load data
+    r""" Load model from file
+
+    从文件中加载obj模型
+    .. note:
+      rand_rotate: 随机旋转
+    """
     try:
       mesh = trimesh.load(path, force='mesh')
       # mesh = o3d.io.read_triangle_mesh(path)
@@ -139,39 +173,49 @@ class Polygon:
       return False
 
   def voxelize(self):
+    r""" Voxelization
+
+    体素化
+    """
     self.voxel_grid = VoxelGrid(self.grid_size)
     # print('voxelizing...')
     vtx = (self.vertices + self.bound) * self.grid_size
     trg = self.triangles
     # pre-processing
-    # print(f'vertices: {len(vtx)}, triangles: {len(trg)}')
     s_points = np.stack([vtx[trg[:,0]], vtx[trg[:,1]], vtx[trg[:,2]]], axis=1)
-    surface = Surface(torch.Tensor(s_points))
+    # first group of  triangles
+    surface = Surface(torch.Tensor(s_points).to(device))
+    # filling voxel grid
     self.voxel_grid.fill(surface)
-    # print('voxelization finished')
     return self.voxel_grid.voxels
 
   def compute_closests(self):
-    # print('computing closest points')
+    r""" Compute closest points
+
+    计算最近点
+    每 grid_size**2 为一组计算最近点
+    .. note:
+      - center cube: 等分模型位置 -0.5 ~ 0.5 / grid_size
+    """
+
     # compute center cube
     seg = 1 / self.grid_size
     col = np.arange(-self.bound + seg / 2 , self.bound + seg / 2, seg)
     x, y, z = np.meshgrid(col, col, col)
     center_cube = np.stack([x, y, z], axis=3)
     # init closest points
-    self.closest_points = torch.Tensor(32,32,32,3)
+    self.closest_points = torch.Tensor(self.grid_size,self.grid_size,self.grid_size,3)
     # compute closest points
     vertices = torch.cat([torch.Tensor(self.vertices), torch.Tensor(self.sample_points)], dim=0)
-    cube = torch.Tensor(center_cube).reshape(-1,self.grid_size**2, 3)
-
+    cube = torch.Tensor(center_cube).reshape(-1,self.grid_size**2, 3).to(device)
 
     for k in cube:
       diff = vertices - k[:, np.newaxis]
-      dist = torch.norm(diff, dim=2)
-      k_cp_index = torch.Tensor(torch.argmin(dist, dim=1))
+      dist = torch.norm(diff, dim=2).to(device)
+      k_cp_index = torch.Tensor(torch.argmin(dist, dim=1)).to(device)
       k_cp = vertices[k_cp_index]
-      k = torch.floor((k + self.bound) * self.grid_size).int()
-      self.closest_points[k[:,0], k[:,1], k[:,2]] = torch.Tensor(k_cp[:,])
+      k = torch.floor((k + self.bound) * self.grid_size).int().to(device)
+      self.closest_points[k[:,0], k[:,1], k[:,2]] = torch.Tensor(k_cp[:,]).to(device)
 
     self.closest_points = self.closest_points.cpu().numpy()
 
@@ -189,9 +233,13 @@ class Polygon:
       'closest_points': self.closest_points
     }
     sio.savemat(path, data)
-    # np.save(path + '.npy', self.voxel_grid.voxels)
+
 
   def process(self, path, rand_rotate = False):
+    r""" Process model
+    集成处理
+    模型载入 + 体素化 + 最近点计算
+    """
     if not self.load_model(path, rand_rotate):
       return False
     self.voxelize()

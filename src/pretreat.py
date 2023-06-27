@@ -3,8 +3,18 @@ import threading
 import time
 
 class Pretreator:
+  r""" Pretreator for Polygon
+
+  Polygon预处理器
+  多线程处理 ShapeNetCore.v2 模型数据集
+  """
+
   models = []
   def __init__(self, index_files: list):
+    r""" Init Pretreator
+
+    载入索引 
+    """
     self.index_files = index_files
     for f in index_files:
       with open(f, 'r') as fs:
@@ -30,8 +40,8 @@ class Pretreator:
       cnt += 1
       try:
         p = Polygon(id)
-        p.process(path, rand_rotate = True)
-        p.dump(output_path + '/' + id + '.mat')
+        p.process(path, rand_rotate = True) # 预处理
+        p.dump(output_path + '/' + id + '.mat') # 保存
       except Exception as e:
         print(e)
         continue

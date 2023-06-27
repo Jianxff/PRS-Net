@@ -1,7 +1,20 @@
 import os
 import random
 
+
 class ShapeNetIndex:
+  r""" Index for pretreated data on ShapeNetCore.v2
+  
+  ShapeNetCore.v2 预处理数据集索引
+  为方便训练, 将数据集分为训练集和测试集, 并生成索引文件
+  .. note:
+    - index_dir: 索引文件存放目录
+    - result_dir: 预处理结果存放目录
+    - dataset: 数据集全集索引
+    - data_train: 训练集索引
+    - data_test: 测试集索引
+  """
+
   index_dir: os.path
   result_dir: os.path
   dataset: list
@@ -27,6 +40,13 @@ class ShapeNetIndex:
     print(f'filter {cnt} models')
 
   def split(self,test_proportion = 0.1):
+    r""" Split dataset into train and test set
+    随机划分数据集为训练集和测试集
+
+    ..note:
+      - test_proportion: 测试集比例
+    """
+
     random.shuffle(self.dataset)
     test_num = int(len(self.dataset) * test_proportion)
     self.data_test = self.dataset[:test_num]
@@ -34,6 +54,11 @@ class ShapeNetIndex:
     print(f'split {len(self.data_train)} train models and {len(self.data_test)} test models')
   
   def dump(self):
+    r""" Dump index file
+    
+    生成索引文件
+    """
+
     train_path = os.path.join(self.index_dir, 'ShapeNetCore.v2.train')
     test_path = os.path.join(self.index_dir, 'ShapeNetCore.v2.test')
     

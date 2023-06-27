@@ -6,18 +6,22 @@ import scipy.io as sio
 import time
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+r""" Test PRS-Net with ShapeNetCore.v2.train dataset
+模型测试
+"""
+
 def log(str):
   with open('../test.log', 'a') as f:
     f.write(str + '\n')
 
 log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ==========')
 
-limit = 500
-save_dir = '/root/autodl-tmp/ShapeNetCore.v2-RS'
+limit = 500 # test model limit (*-1 for no limit)
+save_dir = '/root/autodl-tmp/ShapeNetCore.v2-RS' # output path
 
 prs_net = PRSNet()
 loss_fn = LossFn(weight=25).to(device)
-data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.test', batch_size=1, shuffle=True,test=True)
+data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.test', batch_size=1, shuffle=True, test=True)
 dataset = data_loader.dataset()
 
 prs_net.load_network('epoch_10')

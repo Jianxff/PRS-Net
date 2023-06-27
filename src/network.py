@@ -3,6 +3,13 @@ import torch.nn as nn
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class PRSNet(nn.Module):
+  r""" PRS-Net: Planar Reflective Symmetry Detection Net
+
+  PRS-Net: 平面反射对称检测网络
+  .. note:
+    - conv3d: 3d convolution
+    - linear: fully connected layer
+  """
   def __init__(self):
     super(PRSNet, self).__init__()
     # convolution 3d
@@ -11,26 +18,28 @@ class PRSNet(nn.Module):
     self.linear_reflect = []
     self.linear_rotate = []
 
-    # linear 
+    # basic bias 
     bias_reflect = [[1.,0,0,0],[0,1.,0,0],[0,0,1.,0]]
     bias_rotate = [[0,1.,0,0], [0,0,1.,0], [0,0,0,1.]]
     for i in range(3):
       # symmetry reflection
       self.__setattr__(f'linear_plane_{i}', self.linear_layer(bias_reflect[i],clear_weight=True).to(device))
-      # self.linear_reflect.append(self.linear_layer(bias_reflect[i]).to(device))
       # symmetry rotation
       self.__setattr__(f'linear_axis_{i}', self.linear_layer(bias_rotate[i]).to(device))
-      # self.linear_rotate.append(self.linear_layer(bias_rotate[i]).to(device))
 
 
   def forward(self, voxel):
+    r""" Forward propagation
+
+    前向传播
+    voxel_grid -> plane * 3 & axis * 3
+    """
     # convolution 3d 
     v_conved = self.conv3d(voxel)
     v_conved = v_conved.reshape(v_conved.size(0),-1).to(device)
 
     # linear calculate
-    planes = []
-    axes = []
+    planes = [], axes = []
     for i in range(3):
       plane = self.__getattr__(f'linear_plane_{i}')(v_conved)
       plane = plane / (1e-12 + torch.norm(plane[:,:3], dim=1).unsqueeze(1))
