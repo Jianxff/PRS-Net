@@ -36,7 +36,8 @@ class PRSNet(nn.Module):
     v_conved = v_conved.reshape(v_conved.size(0),-1).to(device)
 
     # linear calculate
-    planes = [], axes = []
+    planes = []
+    axes = []
     for i in range(3):
       plane = self.__getattr__(f'linear_plane_{i}')(v_conved)
       plane = plane / (1e-12 + torch.norm(plane[:,:3], dim=1).unsqueeze(1))
@@ -83,11 +84,11 @@ class PRSNet(nn.Module):
     return nn.Sequential(*model)
   
   def save_network(self, label):
-    path = f'../checkpoint/prs_net_{label}.pth'
+    path = f'checkpoint/prs_net_{label}.pth'
     torch.save(self.state_dict(), path)
 
   def load_network(self, label):
-    path = f'../checkpoint/prs_net_{label}.pth'
+    path = f'checkpoint/prs_net_{label}.pth'
     self.load_state_dict(torch.load(path))
 
     

@@ -38,7 +38,7 @@ class ShapeNetData(Dataset):
     res = {
       'id': id,
       'bound': data['bound'][0][0],
-      'vertices': torch.Tensor(data['vertices']).to(device) if self.test else None,
+      'vertices': torch.Tensor(data['vertices']).to(device) if self.test else [],
       'grid_size': data['grid_size'][0][0],
       'sample_points': torch.Tensor(data['sample_points']).to(device),
       'voxel_grid': torch.Tensor(data['voxel_grid']).unsqueeze(0).to(device),
@@ -77,7 +77,7 @@ class ShapeNetLoader:
     self.loader = torch.utils.data.DataLoader(
       dataset,
       batch_size=batch_size,
-      shuffle=shuffle
+      shuffle=shuffle,
     )
   
   def dataset(self):

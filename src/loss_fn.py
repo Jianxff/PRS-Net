@@ -21,13 +21,11 @@ def quat_muliply(q1: Tensor, q2: Tensor):
                u10*u22 - u11*u23 + u12*u20 + u13*u21,
                u10*u23 + u11*u22 - u12*u21 + u13*u20)
   """
-
   batch = q1.shape[0]
-  q1 = q1.reshape(-1,4)
-  q2 = q2.reshape(-1,4)
-  qr = q1[:,0]*q2[:,0] - torch.sum(q1[:,1:]*q2[:,1:],dim=1).to(device)
-  qi = q1[:,0].reshape(-1,1)*q2[:,1:] + q2[:,0].reshape(-1,1)*q1[:,1:] + torch.cross(q1[:,1:],q2[:,1:]).to(device)
-  q = torch.cat((qr.reshape(-1,1), qi.reshape(-1,3)), dim=1).to(device)
+  qr = q1[:,:,0]*q2[:,:,0] - torch.sum(q1[:,:,1:]*q2[:,:,1:],dim=2).to(device)
+  qi = q1[:,:,0].reshape(batch,-1,1)*q2[:,:,1:] + q2[:,:,0].reshape(batch,-1,1)*q1[:,:,1:]
+  qi += torch.cross(q1[:,:,1:],q2[:,:,1:],dim=2).to(device)
+  q = torch.cat((qr.reshape(batch,-1,1), qi.reshape(batch,-1,3)), dim=2).to(device)
   return q.reshape(batch,-1,4)
 
 

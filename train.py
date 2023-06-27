@@ -20,7 +20,7 @@ n_epoch = 100 # epoch number
 
 prs_net = PRSNet().to(device)
 loss_fn = LossFn(weight = 25).to(device)
-data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.train',batch_size)
+data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.train',batch_size=batch_size,shuffle=True)
 dataset = data_loader.dataset()
 
 # Adam optimizer with learning rate 0.01
