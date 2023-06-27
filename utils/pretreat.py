@@ -1,4 +1,4 @@
-from polygon import Polygon
+from src.polygon import Polygon
 import threading
 import time
 import os

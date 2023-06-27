@@ -1,7 +1,7 @@
 import torch
-from dataset import ShapeNetLoader, ShapeNetData
-from network import PRSNet
-from loss_fn import LossFn
+from src.dataset import ShapeNetLoader, ShapeNetData
+from src.network import PRSNet
+from src.loss_fn import LossFn
 import time
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -10,7 +10,7 @@ r""" Train PRS-Net with ShapeNetCore.v2.train dataset
 """
 
 def log(str):
-  with open('../train.log', 'a') as f:
+  with open('log/train.log', 'a') as f:
     f.write(str + '\n')
 
 log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ==========')
