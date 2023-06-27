@@ -1,6 +1,8 @@
 from polygon import Polygon
 import threading
 import time
+import os
+
 
 class Pretreator:
   r""" Pretreator for Polygon
@@ -22,16 +24,16 @@ class Pretreator:
           id, obj, res = line.split()
           self.models.append((id, obj))
 
-  def process(self, thread_num = 1):
+  def process(self, output_path, thread_num = 1):
     step = len(self.models) // thread_num
     for i in range(thread_num):
       if i == thread_num - 1:
-        threading.Thread(target=self.__process_thread__, args=(i, self.models[i*step:])).start()
+        threading.Thread(target=self.__process_thread__, args=(i, self.models[i*step:], output_dir)).start()
       else:
-        threading.Thread(target=self.__process_thread__, args=(i, self.models[i*step:(i+1)*step])).start()
+        threading.Thread(target=self.__process_thread__, args=(i, self.models[i*step:(i+1)*step], output_dir)).start()
 
   @staticmethod
-  def __process_thread__(label, models):
+  def __process_thread__(label, models, output_dir):
     cnt = 0
     all = len(models)
     start_tm = time.time()
@@ -41,7 +43,7 @@ class Pretreator:
       try:
         p = Polygon(id)
         p.process(path, rand_rotate = True) # 预处理
-        p.dump(output_path + '/' + id + '.mat') # 保存
+        p.dump(os.path.join(output_dir, (id + '.mat'))) # 保存
       except Exception as e:
         print(e)
         continue
@@ -50,5 +52,6 @@ class Pretreator:
 
 
 indexs = ['/root/autodl-tmp/ShapeNetCore.v2.train', '/root/autodl-tmp/ShapeNetCore.v2.test']
+output_dir = '/root/autodl-tmp/ShapeNetCore.v2-PT'
 pretreator = Pretreator(indexs)
-pretreator.process(thread_num=6)
+pretreator.process(output_dir, thread_num=6)
