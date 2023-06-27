@@ -107,5 +107,5 @@ class LossFn(torch.nn.Module):
   def forward(self, polygon: dict, planes, axes):
     ref_loss, rot_loss = self.sym_loss(polygon,planes, axes)
     reg_loss = self.reg_loss(planes, axes)
-    return ref_loss, rot_loss, reg_loss
+    return ref_loss, rot_loss, reg_loss * self.weight
 
