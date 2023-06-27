@@ -81,7 +81,7 @@ class SymmetryLoss(torch.nn.Module):
   def __init__(self):
     super(SymmetryLoss, self).__init__()
   
-  def acc_reflect(self, plane: Tensor, polygon: dict):
+  def reflect_loss(self, plane: Tensor, polygon: dict):
     r""" Accumulate reflect loss
 
     累计反射平面对称损失
@@ -97,7 +97,7 @@ class SymmetryLoss(torch.nn.Module):
     points_t = points - dst * n
     return DistCount.apply(points_t, polygon)
 
-  def acc_rotate(self, quat: Tensor, polygon: dict):
+  def rotate_loss(self, quat: Tensor, polygon: dict):
     r""" Accumulate rotate loss
 
     累计旋转轴对称损失
@@ -126,14 +126,19 @@ class SymmetryLoss(torch.nn.Module):
 
     平面反射对称损失 + 旋转轴对称损失
     """
-    ref_loss = torch.Tensor([0]).to(device)
-    rot_loss = torch.Tensor([0]).to(device)
+    # ref_loss = torch.Tensor([0]).to(device)
+    # rot_loss = torch.Tensor([0]).to(device)
+    ref_loss = []
+    rot_loss = []
     for p in planes:
-      loss = self.acc_reflect(p, polygon)
-      ref_loss += loss
+      ref_loss.append(self.reflect_loss(p, polygon))
+      # loss = self.reflect_loss(p, polygon)
+      # self.ref_loss.append(loss)
+      # ref_loss += loss
     for a in axes:
-      rot_loss += self.acc_rotate(a, polygon)
-    return ref_loss, rot_loss
+      rot_loss.append(self.rotate_loss(a, polygon))
+      # rot_loss += self.rotate_loss(a, polygon)
+    return torch.stack(ref_loss,dim=0), torch.stack(rot_loss,dim=0)
 
 
 class RegularLoss(torch.nn.Module):
@@ -145,7 +150,7 @@ class RegularLoss(torch.nn.Module):
   def __init__(self):
     super(RegularLoss, self).__init__()
 
-  def acc_transpose(self,data:torch.Tensor):
+  def list_transpose(self,data:torch.Tensor):
     r""" Accumulate transpose
 
     batch 转置
@@ -167,7 +172,7 @@ class RegularLoss(torch.nn.Module):
     axes[u0, u1, u2, u3] -> M2 = [u1/|u1|, u2/|u2|, u3/|u3|]_T
     loss = M * M_T - I
     """
-    planes, axes = self.acc_transpose(planes), self.acc_transpose(axes)
+    planes, axes = self.list_transpose(planes), self.list_transpose(axes)
     mat_I = torch.eye(3).unsqueeze(0).to(device)
     n_vec = planes[:,:,:-1]
     n_vec = n_vec / torch.norm(n_vec, dim=2).unsqueeze(2)
@@ -179,8 +184,36 @@ class RegularLoss(torch.nn.Module):
     M2_T = torch.transpose(M2,1,2)
     A = torch.matmul(M1[:,], M1_T[:,]) - mat_I
     B = torch.matmul(M2[:,], M2_T[:,]) - mat_I
-    loss = torch.mean(torch.norm(A, dim=1)**2 + torch.norm(B, dim=1)**2)
+    loss = torch.mean(A.pow(2).sum(2).sum(1) + B.pow(2).sum(2).sum(1))
     return loss
+
+class Loss:
+  r""" Loss class
+  """
+  def __init__(self, ref_loss_list, rot_loss_list, reg_loss):
+    self.set(ref_loss_list, rot_loss_list, reg_loss)
+
+  def set(self, ref_loss_list, rot_loss_list, reg_loss):
+    self.ref_list = ref_loss_list
+    self.rot_list = rot_loss_list
+    self.reg = reg_loss
+    self.ref = ref_loss_list.sum()
+    self.rot = rot_loss_list.sum()
+    self.all = self.ref + self.rot + self.reg
+
+  def dump(self):
+    return {
+      'reflect': self.ref_list.detach().cpu().numpy().tolist(),
+      'rotate': self.rot_list.detach().cpu().numpy().tolist(),
+      'regular': self.reg.detach().cpu(),
+      'all': self.all.detach().cpu()
+    }
+
+  def __str__(self):
+    ref_str = f'ref: {self.ref_list[0].item():.3f} + {self.ref_list[1].item():.3f} + {self.ref_list[2].item():.3f}'
+    rot_str = f'rot: {self.rot_list[0].item():.3f} + {self.rot_list[1].item():.3f} + {self.rot_list[2].item():.3f}'
+    return f'loss: {self.all.item():.3f} <reg: {self.reg.item():3f}, {ref_str}, {rot_str}>'
+
 
 
 class LossFn(torch.nn.Module):
@@ -197,5 +230,6 @@ class LossFn(torch.nn.Module):
   def forward(self, polygon: dict, planes, axes):
     ref_loss, rot_loss = self.sym_loss(polygon,planes, axes)
     reg_loss = self.reg_loss(planes, axes)
-    return ref_loss, rot_loss, reg_loss * self.weight
+    return Loss(ref_loss, rot_loss, reg_loss * self.weight)
+
 

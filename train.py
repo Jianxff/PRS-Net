@@ -29,26 +29,23 @@ optimizer = torch.optim.Adam(prs_net.parameters(), lr=0.01)
 for epoch in range(n_epoch + 1):
   epoch_tm = time.time()
   prs_net = prs_net.to(device)
-  loss_str = ''
+  loss = None
 
   for i, data in enumerate(dataset):
     iter_tm = time.time()
     data = ShapeNetData.auto_grad(data)
     planes, axes = prs_net(data['voxel_grid'])
     
-    ref_loss, rot_loss, reg_loss = loss_fn(data,planes,axes)
-    loss = ref_loss + rot_loss + reg_loss
-
+    loss = loss_fn(data,planes,axes) # loss
     optimizer.zero_grad() # clear grad
-    loss.backward()       # backward
-    optimizer.step()      # update parameters
+    loss.all.backward() # backward
+    optimizer.step() # update parameters
 
-    loss_str = f'loss: {loss.item():.3f} <ref: {ref_loss.item():.3f}, rot: {rot_loss.item():.3f}, reg: {reg_loss.item():.3f}>'
-    print(f'[epoch {epoch}, iter {i}] {loss_str}, time: {(time.time() - iter_tm):.3f}')
+    print(f'[epoch {epoch}, iter {i}] {str(loss)}, time: {(time.time() - iter_tm):.3f}')
   
   if epoch % 10 == 0:
     prs_net.save_network(f'epoch_{epoch}')
   
-  log(f'[epoch {epoch}] {loss_str}, time: {(time.time() - epoch_tm):.3f}')
+  log(f'[epoch {epoch}] {str(loss)}, time: {(time.time() - epoch_tm):.3f}')
 
 prs_net.save_network('latest')

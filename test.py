@@ -16,7 +16,7 @@ def log(str):
 
 log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ==========')
 
-limit = 500 # test model limit (*-1 for no limit)
+limit = 50 # test model limit (*-1 for no limit)
 save_dir = '/root/autodl-tmp/ShapeNetCore.v2-RS' # output path
 
 prs_net = PRSNet()
@@ -24,7 +24,7 @@ loss_fn = LossFn(weight=25).to(device)
 data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.test', batch_size=1, shuffle=True, test=True)
 dataset = data_loader.dataset()
 
-prs_net.load_network('epoch_10')
+prs_net.load_network('epoch_0')
 prs_net = prs_net.to(device)
 
 for i, data in enumerate(dataset):
@@ -32,11 +32,11 @@ for i, data in enumerate(dataset):
     break
   iter_tm = time.time()
   planes, axes = prs_net(data['voxel_grid'])
-  ref_loss, rot_loss, reg_loss = loss_fn(data,planes,axes)
-  loss = ref_loss + rot_loss + reg_loss
+  loss = loss_fn(data,planes,axes)
 
   result = {
     'id': data['id'][0],
+    'loss': loss.dump(),
     'vertices': data['vertices'].cpu().numpy()[0],
     'sample_points': data['sample_points'].detach().cpu().numpy()[0],
     'closest_points': data['closest_points'].detach().cpu().numpy()[0],
@@ -46,7 +46,6 @@ for i, data in enumerate(dataset):
 
   sio.savemat(f'{save_dir}/{data["id"][0]}.mat', result)
 
-  loss_str = f'loss: {loss.item():.4f} <ref: {ref_loss.item():.3f}, rot: {rot_loss.item():.3f}, reg: {reg_loss.item():.3f}>'
-  print(f'[id {data["id"][0]}] {loss_str}, time: {(time.time() - iter_tm):.3f}')
-  log(f'[id {data["id"][0]}] {loss_str}, time: {(time.time() - iter_tm):.3f}')
+  print(f'[id {data["id"][0]}] {str(loss)}, time: {(time.time() - iter_tm):.3f}')
+  log(f'[id {data["id"][0]}] {str(loss)}, time: {(time.time() - iter_tm):.3f}')
 
