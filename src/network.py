@@ -15,9 +15,6 @@ class PRSNet(nn.Module):
     # convolution 3d
     self.conv3d = self.conv_layer()
     # linear
-    self.linear_reflect = []
-    self.linear_rotate = []
-
     # basic bias 
     bias_reflect = [[1.,0,0,0],[0,1.,0,0],[0,0,1.,0]]
     bias_rotate = [[0,1.,0,0], [0,0,1.,0], [0,0,0,1.]]
