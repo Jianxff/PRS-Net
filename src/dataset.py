@@ -73,13 +73,14 @@ class ShapeNetLoader:
   """
 
   def __init__(self, index_file, batch_size, shuffle=False, test=False):
-    dataset = ShapeNetData(index_file,test)
-    self.loader = torch.utils.data.DataLoader(
-      dataset,
-      batch_size=batch_size,
-      shuffle=shuffle,
-    )
+    self.data_set = ShapeNetData(index_file,test)
+    self.batch_size = batch_size
+    self.shuffle = shuffle
   
   def dataset(self):
-    return self.loader
+    return torch.utils.data.DataLoader(
+      self.data_set,
+      batch_size=self.batch_size,
+      shuffle=self.shuffle,
+    )
 

@@ -92,7 +92,7 @@ class SymmetryLoss(torch.nn.Module):
     plane = plane.unsqueeze(1)
     n, d = plane[:,:,:-1], plane[:,:,3]
     
-    dst = 2 * (torch.sum(points * n, dim=2) + d) / (torch.norm(n, dim=2) ** 2 + 1e-12)
+    dst = 2 * (torch.sum(points * n, dim=2) + d) / (torch.norm(n, dim=2).pow(2) + 1e-12)
     dst = dst.unsqueeze(2)
     points_t = points - dst * n
     return DistCount.apply(points_t, polygon)
@@ -119,7 +119,10 @@ class SymmetryLoss(torch.nn.Module):
     points_t = quat_muliply(points_t, quat_inv)
     # quat to points
     points_t = points_t[:,:,1:]
-    return DistCount.apply(points_t, polygon)
+    # rotation angle enhance
+    theta = torch.acos(quat_u[:,:,0]) * 2 * 180 / torch.pi
+    theta = torch.where(theta > 180, 360 - theta, theta)
+    return DistCount.apply(points_t, polygon) + torch.reciprocal(theta).mean()
 
   def __call__(self, polygon: dict, planes, axes):
     r""" Call function

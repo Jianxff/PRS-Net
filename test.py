@@ -11,16 +11,18 @@ r""" Test PRS-Net with ShapeNetCore.v2.train dataset
 """
 
 def log(str):
+  print(str)
   with open('log/test.log', 'a') as f:
     f.write(str + '\n')
 
 log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ==========')
+test_tm = time.time()
 
 limit = 50 # test model limit (*-1 for no limit)
 save_dir = '/root/autodl-tmp/ShapeNetCore.v2-RS' # output path
 
 prs_net = PRSNet()
-loss_fn = LossFn(weight=25).to(device)
+loss_fn = LossFn(weight=50).to(device)
 data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.test', batch_size=1, shuffle=True, test=True)
 dataset = data_loader.dataset()
 
@@ -46,6 +48,7 @@ for i, data in enumerate(dataset):
 
   sio.savemat(f'{save_dir}/{data["id"][0]}.mat', result)
 
-  print(f'[id {data["id"][0]}] {str(loss)}, time: {(time.time() - iter_tm):.3f}')
   log(f'[id {data["id"][0]}] {str(loss)}, time: {(time.time() - iter_tm):.3f}')
+
+log(f'[testing] finish testing in {(time.time() - test_tm):.3f} seconds')
 
