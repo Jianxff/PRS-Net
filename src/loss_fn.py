@@ -30,13 +30,8 @@ def quat_muliply(q1: Tensor, q2: Tensor):
 
 
 class DistCount(torch.autograd.Function):
-  r""" Distance count loss function
-
-  距离计数损失函数
-  体素网格索引: [(Point + Bound) * GridSize] -> (3 * 3) int
-  """
   @staticmethod
-  def forward(ctx, points: Tensor, polygon: dict, weight: float = 1):
+  def closest(points: Tensor, polygon: dict):
     # get data
     bound, grid_size = polygon['bound'][0], polygon['grid_size'][0]
     closest_points = polygon['closest_points'].reshape(-1,grid_size,grid_size,grid_size,3)
@@ -50,12 +45,21 @@ class DistCount(torch.autograd.Function):
       clp = cp[idx[:,0], idx[:,1], idx[:,2]].unsqueeze(0)
       closest = torch.cat((closest, clp), dim=0)
     # dist count
-    dist = points - closest
+    return closest
+  
+  r""" Distance count loss function
+
+  距离计数损失函数
+  体素网格索引: [(Point + Bound) * GridSize] -> (3 * 3) int
+  """
+  @staticmethod
+  def forward(ctx,points: Tensor, polygon: dict, bias = 0, weight: float = 1):
+    dist = (points - DistCount.closest(points, polygon))
     # save for context
     ctx.constant = weight
     ctx.save_for_backward(dist)
     # return loss
-    norm_dist = torch.pow(dist, 2).to(device)
+    norm_dist = torch.pow(dist, 2).to(device) - bias
     return torch.mean(torch.sum(norm_dist, dim=1)) * weight
   
   @staticmethod
@@ -81,23 +85,23 @@ class SymmetryLoss(torch.nn.Module):
   def __init__(self):
     super(SymmetryLoss, self).__init__()
   
-  def reflect_loss(self, plane: Tensor, polygon: dict):
+  def reflect_loss(self, plane: Tensor, polygon: dict, bias = 0):
     r""" Accumulate reflect loss
 
     累计反射平面对称损失
     reflect: p -> p - 2 * (p * n + d) / (||n|| ** 2 + 1e-12)
     """
 
-    points = polygon['sample_points']
+    samples = polygon['sample_points']
     plane = plane.unsqueeze(1)
     n, d = plane[:,:,:-1], plane[:,:,3]
     
-    dst = 2 * (torch.sum(points * n, dim=2) + d) / (torch.norm(n, dim=2).pow(2) + 1e-12)
+    dst = 2 * (torch.sum(samples * n, dim=2) + d) / (torch.norm(n, dim=2).pow(2) + 1e-12)
     dst = dst.unsqueeze(2)
-    points_t = points - dst * n
-    return DistCount.apply(points_t, polygon)
+    points_t = samples - dst * n
+    return DistCount.apply(points_t, polygon, bias)
 
-  def rotate_loss(self, quat: Tensor, polygon: dict):
+  def rotate_loss(self, quat: Tensor, polygon: dict, bias = 0):
     r""" Accumulate rotate loss
 
     累计旋转轴对称损失
@@ -108,9 +112,9 @@ class SymmetryLoss(torch.nn.Module):
       *q_inv: (q_r, -q_i) (*q is normalized)
     """
 
-    points = polygon['sample_points']
+    samples = polygon['sample_points']
     # points -> (0, points)
-    points = torch.cat((torch.zeros(points.shape[0],points.shape[1],1).to(device), points), dim=2)
+    points = torch.cat((torch.zeros(samples.shape[0],samples.shape[1],1).to(device), samples), dim=2)
     # rotate
     quat_u = quat.unsqueeze(1)
     quat_inv = quat_u * torch.tensor([1,-1,-1,-1]).to(device)
@@ -122,7 +126,7 @@ class SymmetryLoss(torch.nn.Module):
     # rotation angle enhance
     theta = torch.acos(quat_u[:,:,0]) * 2 * 180 / torch.pi
     theta = torch.where(theta > 180, 360 - theta, theta)
-    return DistCount.apply(points_t, polygon) + torch.reciprocal(theta).mean()
+    return DistCount.apply(points_t, polygon, bias) + torch.reciprocal(theta).mean()
 
   def __call__(self, polygon: dict, planes, axes):
     r""" Call function
@@ -133,11 +137,10 @@ class SymmetryLoss(torch.nn.Module):
     # rot_loss = torch.Tensor([0]).to(device)
     ref_loss = []
     rot_loss = []
+    # samples = polygon['sample_points']
+    # bias = (samples - DistCount.closest(samples, polygon)).pow(2).to(device)
     for p in planes:
       ref_loss.append(self.reflect_loss(p, polygon))
-      # loss = self.reflect_loss(p, polygon)
-      # self.ref_loss.append(loss)
-      # ref_loss += loss
     for a in axes:
       rot_loss.append(self.rotate_loss(a, polygon))
       # rot_loss += self.rotate_loss(a, polygon)

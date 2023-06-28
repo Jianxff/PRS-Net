@@ -18,7 +18,7 @@ log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ========
 train_tm = time.time()
 
 batch_size = 32 # batch size
-n_epoch = 200 # epoch number
+n_epoch = 100 # epoch number
 
 prs_net = PRSNet().to(device)
 loss_fn = LossFn(weight = 50).to(device)

@@ -18,7 +18,7 @@ def log(str):
 log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ==========')
 test_tm = time.time()
 
-limit = 50 # test model limit (*-1 for no limit)
+limit = 500 # test model limit (*-1 for no limit)
 save_dir = '/root/autodl-tmp/ShapeNetCore.v2-RS' # output path
 
 prs_net = PRSNet()
@@ -26,7 +26,7 @@ loss_fn = LossFn(weight=50).to(device)
 data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.test', batch_size=1, shuffle=True, test=True)
 dataset = data_loader.dataset()
 
-prs_net.load_network('epoch_0')
+prs_net.load_network('latest')
 prs_net = prs_net.to(device)
 
 for i, data in enumerate(dataset):
