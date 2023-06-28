@@ -59,8 +59,8 @@ class ShapeNetIndex:
     生成索引文件
     """
 
-    train_path = os.path.join(self.index_dir, 'ShapeNetCore.v2.train')
-    test_path = os.path.join(self.index_dir, 'ShapeNetCore.v2.test')
+    train_path = os.path.join(self.index_dir, 'shapenet.train')
+    test_path = os.path.join(self.index_dir, 'shapenet.test')
     
     with open(train_path, 'w') as f:
       for id, path in self.data_train:
@@ -75,7 +75,7 @@ class ShapeNetIndex:
 
 dataset_path = '/root/autodl-tmp/ShapeNetCore.v2'
 shapenet = ShapeNetIndex(index_dir='/root/autodl-tmp',
-                         result_dir='/root/autodl-tmp/ShapeNetCore.v2-PT')
+                         result_dir='/root/autodl-tmp/shapenet')
 shapenet.filter(dataset_path)
 shapenet.split(test_proportion=0.1)
 shapenet.dump()

@@ -12,7 +12,7 @@ Implementation for PRS-Net: Planar Reflective Symmetry Detection Net for 3D Mode
 
 - pre-processing original `ShapeNetCore.v2` dataset, including voxelization and compute closest points
   ``` bash
-  python utils/pretreat.py
+  python pretreat.py
   ```
 
 - train network

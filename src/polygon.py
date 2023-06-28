@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import random
 import scipy.io as sio
 from scipy.spatial.transform import Rotation
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -39,8 +40,12 @@ class Surface:
   def filter(self, max):
     dist = self.dist()
     # filter by point 0 and point 1
-    mask = [torch.Tensor(dist[:,0] > max), torch.Tensor(dist[:,1] > max), torch.Tensor(dist[:,2] > max)]
-    f_mask = [torch.logical_not(mask[0]), torch.logical_not(mask[1]), torch.logical_not(mask[2])]
+    mask = [torch.Tensor(dist[:,0] > max).to(device), 
+            torch.Tensor(dist[:,1] > max).to(device), 
+            torch.Tensor(dist[:,2] > max).to(device)]
+    f_mask = [torch.logical_not(mask[0]).to(device), 
+              torch.logical_not(mask[1]).to(device), 
+              torch.logical_not(mask[2]).to(device)]
     data_mask = [mask[0], (mask[1] & f_mask[0]), (mask[2] & f_mask[1] & f_mask[0])]
 
     splited = Surface()
@@ -54,8 +59,8 @@ class Surface:
   def split(self, type):
     if not self.valid(): return Surface()
     mid = (self.data[:,type] + self.data[:,(type + 1) % 3]) / 2
-    s1 = torch.stack((mid, self.data[:,type], self.data[:,(type + 2) % 3]), dim=1)
-    s2 = torch.stack((mid, self.data[:,(type + 1) % 3], self.data[:,(type + 2) % 3]), dim=1)
+    s1 = torch.stack((mid, self.data[:,type], self.data[:,(type + 2) % 3]), dim=1).to(device)
+    s2 = torch.stack((mid, self.data[:,(type + 1) % 3], self.data[:,(type + 2) % 3]), dim=1).to(device)
     return Surface(torch.cat((s1, s2), dim=0))
     
 
@@ -66,6 +71,7 @@ class VoxelGrid:
   .. note:
     - index3d: 三维索引 p(x,y,z) -> [(p + Bound) * GridSize]
     - fill: 三角面填充
+    超出边界的点将被填充到临时扩展的1个padding上
   """
   size: int
   voxels: np.ndarray
@@ -75,16 +81,16 @@ class VoxelGrid:
 
   def index3d(self, points, bias = 0):
     idx = np.floor(points  + bias).astype(int)
-    idx = np.where((idx >= 0) & (idx < self.size), idx, self.size)
+    idx = np.where((idx >= 0) & (idx < self.size), idx, self.size)  # fill to temp padding
     return idx
   
   def fill_iter(self, surface: Surface, limit = 1):
     s_ready, s_wait = Surface(), surface
     while(s_wait.valid()):
-      # split while trianlge number < 1000000
-      if s_wait.data.shape[0] < 1000000:
-        # 5 times split
-        for i in range(5):
+      # split while trianlge number < 500000
+      if s_wait.data.shape[0] < 500000:
+        # 3 times split
+        for i in range(3):
           if s_wait.valid():
             s1, s2 = s_wait.filter(limit)
             s_ready, s_wait = s_ready + s1, s2
@@ -100,14 +106,14 @@ class VoxelGrid:
     r""" Fill voxel grid with surface
 
     体素网格填充
-    中间处理: 增加1个padding边界
+    中间处理: 增加1个临时padding边界
     """
     self.voxels = np.pad(self.voxels, ((0,1),(0,1),(0,1)), 'constant', constant_values=False)
     if not iter:
       self.padding(surface)
     else:
       self.fill_iter(surface, limit)
-    self.voxels = self.voxels[:-1,:-1,:-1]
+    self.voxels = self.voxels[:-1,:-1,:-1]  # remove padding
 
   def padding(self, surface: Surface):
     if not surface.valid(): return
@@ -147,7 +153,7 @@ class Polygon:
     self.grid_size = grid_size
     self.bound = polygon_bound
 
-  def load_model(self, path, rand_rotate = False):
+  def load_model(self, path, rand_rotate:float = 0):
     r""" Load model from file
 
     从文件中加载obj模型
@@ -159,11 +165,11 @@ class Polygon:
       # mesh = o3d.io.read_triangle_mesh(path)
       self.vertices = np.asarray(mesh.vertices)
       self.triangles = np.asarray(mesh.faces,dtype=int)
-      sample, _ = trimesh.sample.sample_surface(mesh, 1000)
+      sample, _ = trimesh.sample.sample_surface(mesh, 1000) # 均匀采样
       self.sample_points = np.asarray(sample)
       if self.sample_points.shape[0] != 1000:
         return False
-      if rand_rotate:
+      if random.random() < rand_rotate:
         R = Rotation.random().as_matrix()
         self.vertices = (np.matmul(R, self.vertices.transpose())).transpose()
         self.sample_points = (np.matmul(R, self.sample_points.transpose())).transpose()
@@ -204,9 +210,9 @@ class Polygon:
     x, y, z = np.meshgrid(col, col, col)
     center_cube = np.stack([x, y, z], axis=3)
     # init closest points
-    self.closest_points = torch.Tensor(self.grid_size,self.grid_size,self.grid_size,3)
+    self.closest_points = torch.Tensor(self.grid_size,self.grid_size,self.grid_size,3).to(device)
     # compute closest points
-    vertices = torch.cat([torch.Tensor(self.vertices), torch.Tensor(self.sample_points)], dim=0)
+    vertices = torch.cat([torch.Tensor(self.vertices), torch.Tensor(self.sample_points)], dim=0).to(device)
     cube = torch.Tensor(center_cube).reshape(-1,self.grid_size**2, 3).to(device)
 
     for k in cube:
@@ -235,7 +241,7 @@ class Polygon:
     sio.savemat(path, data)
 
 
-  def process(self, path, rand_rotate = False):
+  def process(self, path, rand_rotate:float):
     r""" Process model
     集成处理
     模型载入 + 体素化 + 最近点计算

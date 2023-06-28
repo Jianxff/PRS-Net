@@ -30,8 +30,19 @@ def quat_muliply(q1: Tensor, q2: Tensor):
 
 
 class DistCount(torch.autograd.Function):
+  r""" Distance count loss function
+
+  距离计数损失函数
+  体素网格索引: [(Point + Bound) * GridSize] -> (3 * 3) int
+  * 该部分参考了官方仓库实现
+  """
+    
   @staticmethod
   def closest(points: Tensor, polygon: dict):
+    r""" Get closest points from polygon
+    从多边形中获取最近的点
+    """
+
     # get data
     bound, grid_size = polygon['bound'][0], polygon['grid_size'][0]
     closest_points = polygon['closest_points'].reshape(-1,grid_size,grid_size,grid_size,3)
@@ -44,28 +55,29 @@ class DistCount(torch.autograd.Function):
       cp, idx  = closest_points[batch,:], indices[batch,:]
       clp = cp[idx[:,0], idx[:,1], idx[:,2]].unsqueeze(0)
       closest = torch.cat((closest, clp), dim=0)
-    # dist count
+      
     return closest
   
-  r""" Distance count loss function
 
-  距离计数损失函数
-  体素网格索引: [(Point + Bound) * GridSize] -> (3 * 3) int
-  """
   @staticmethod
   def forward(ctx,points: Tensor, polygon: dict, bias = 0, weight: float = 1):
+    r""" Forward propagation
+    前向传播, 计算平均距离损失
+    """
     dist = (points - DistCount.closest(points, polygon))
     # save for context
     ctx.constant = weight
     ctx.save_for_backward(dist)
+
     # return loss
-    norm_dist = torch.pow(dist, 2).to(device) - bias
+    #### the norm_dist is not sqrt() in the official repo, provisionally keep the same here
+    norm_dist = torch.pow(dist, 2).to(device) - bias  
     return torch.mean(torch.sum(norm_dist, dim=1)) * weight
   
+
   @staticmethod
   def backward(ctx, grad_output):
     r""" Backward propagation
-
     反向传播
     dist = (p - closest_p) ** 2 -> every batch_size
     f' = 2 * (p - closest_p) / batch_size
@@ -94,7 +106,7 @@ class SymmetryLoss(torch.nn.Module):
 
     samples = polygon['sample_points']
     plane = plane.unsqueeze(1)
-    n, d = plane[:,:,:-1], plane[:,:,3]
+    n, d = plane[:,:,:-1], plane[:,:,3] # get normal and bias
     
     dst = 2 * (torch.sum(samples * n, dim=2) + d) / (torch.norm(n, dim=2).pow(2) + 1e-12)
     dst = dst.unsqueeze(2)
@@ -110,6 +122,7 @@ class SymmetryLoss(torch.nn.Module):
 
     .. note:
       *q_inv: (q_r, -q_i) (*q is normalized)
+      避免旋转角度过小, 加上角度的倒数作为损失的一部分
     """
 
     samples = polygon['sample_points']
@@ -123,9 +136,13 @@ class SymmetryLoss(torch.nn.Module):
     points_t = quat_muliply(points_t, quat_inv)
     # quat to points
     points_t = points_t[:,:,1:]
-    # rotation angle enhance
+
+    # rotation angle enhance ===============================================
+    #### to avoid the angle is too small, adding the reciprocal of the angle
     theta = torch.acos(quat_u[:,:,0]) * 2 * 180 / torch.pi
     theta = torch.where(theta > 180, 360 - theta, theta)
+    # ======================================================================
+
     return DistCount.apply(points_t, polygon, bias) + torch.reciprocal(theta).mean()
 
   def __call__(self, polygon: dict, planes, axes):
@@ -133,17 +150,18 @@ class SymmetryLoss(torch.nn.Module):
 
     平面反射对称损失 + 旋转轴对称损失
     """
-    # ref_loss = torch.Tensor([0]).to(device)
-    # rot_loss = torch.Tensor([0]).to(device)
     ref_loss = []
     rot_loss = []
+
+    # 实际上原模型采样点通过该计算也有损失，可以加以考虑
     # samples = polygon['sample_points']
     # bias = (samples - DistCount.closest(samples, polygon)).pow(2).to(device)
-    for p in planes:
+
+    for p in planes:  # iter every plane
       ref_loss.append(self.reflect_loss(p, polygon))
-    for a in axes:
+    for a in axes:  # iter every axis (quat)
       rot_loss.append(self.rotate_loss(a, polygon))
-      # rot_loss += self.rotate_loss(a, polygon)
+
     return torch.stack(ref_loss,dim=0), torch.stack(rot_loss,dim=0)
 
 

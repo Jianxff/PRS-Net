@@ -6,7 +6,7 @@ import scipy.io as sio
 import time
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-r""" Test PRS-Net with ShapeNetCore.v2.train dataset
+r""" Test PRS-Net with shapenet.test dataset
 模型测试
 """
 
@@ -18,24 +18,31 @@ def log(str):
 log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ==========')
 test_tm = time.time()
 
+# =================== config ===================
 limit = 500 # test model limit (*-1 for no limit)
-save_dir = '/root/autodl-tmp/ShapeNetCore.v2-RS' # output path
+save_dir = '/root/autodl-tmp/output' # output path
+load_label = 'epoch_80'
 
+# =================== init ===================
 prs_net = PRSNet()
 loss_fn = LossFn(weight=50).to(device)
-data_loader = ShapeNetLoader('/root/autodl-tmp/ShapeNetCore.v2.test', batch_size=1, shuffle=True, test=True)
+data_loader = ShapeNetLoader('/root/autodl-tmp/shapenet.test', batch_size=1, shuffle=True, test=True)
 dataset = data_loader.dataset()
 
-prs_net.load_network('latest')
+# =============== load network ================
+prs_net.load_network(load_label)
 prs_net = prs_net.to(device)
 
 for i, data in enumerate(dataset):
   if limit >= 0 and i >= limit:
     break
   iter_tm = time.time()
-  planes, axes = prs_net(data['voxel_grid'])
-  loss = loss_fn(data,planes,axes)
 
+  # =================== process ===================
+  planes, axes = prs_net(data['voxel_grid'])  # get planes and axes
+  loss = loss_fn(data,planes,axes)  # calculate loss
+  
+  # ==================== dump =====================
   result = {
     'id': data['id'][0],
     'loss': loss.dump(),
