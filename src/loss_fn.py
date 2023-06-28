@@ -229,8 +229,8 @@ class Loss:
     return {
       'reflect': self.ref_list.detach().cpu().numpy().tolist(),
       'rotate': self.rot_list.detach().cpu().numpy().tolist(),
-      'regular': self.reg.detach().cpu(),
-      'all': self.all.detach().cpu()
+      'regular': self.reg.detach().cpu().numpy(),
+      'all': self.all.detach().cpu().numpy()
     }
 
   def __str__(self):
