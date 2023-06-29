@@ -9,21 +9,18 @@ class ShapeNetIndex:
   为方便训练, 将数据集分为训练集和测试集, 并生成索引文件
   .. note:
     - index_dir: 索引文件存放目录
-    - result_dir: 预处理结果存放目录
     - dataset: 数据集全集索引
     - data_train: 训练集索引
     - data_test: 测试集索引
   """
 
   index_dir: os.path
-  result_dir: os.path
   dataset: list
   data_train: list
   data_test: list
 
-  def __init__(self, index_dir, result_dir):
+  def __init__(self, index_dir):
     self.index_dir = index_dir
-    self.result_dir = result_dir
     self.dataset = []
     self.data_test = []
     self.data_train = []
@@ -64,18 +61,17 @@ class ShapeNetIndex:
     
     with open(train_path, 'w') as f:
       for id, path in self.data_train:
-        f.write(f'{id} {path} {self.result_dir}/{id}.mat\n')
+        f.write(f'{id} {path}\n')
     with open(test_path, 'w') as f:
       for id, path in self.data_test:
-        f.write(f'{id} {path} {self.result_dir}/{id}.mat\n')
+        f.write(f'{id} {path}\n')
 
 
 # # 武器, 乐器, 汽车
 # exclude_label = ['04090263','03467517', '02958343']
 
 dataset_path = '/root/autodl-tmp/ShapeNetCore.v2'
-shapenet = ShapeNetIndex(index_dir='/root/autodl-tmp',
-                         result_dir='/root/autodl-tmp/shapenet')
+shapenet = ShapeNetIndex(index_dir='/root/autodl-tmp')
 shapenet.filter(dataset_path)
 shapenet.split(test_proportion=0.1)
 shapenet.dump()

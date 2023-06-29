@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset
 from torch.autograd import Variable
 import scipy.io as sio
+import random
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -23,13 +24,13 @@ class ShapeNetData(Dataset):
     *仅在测试时有效
   """
 
-  def __init__(self, index_path, test=False):
+  def __init__(self, index_path, origin_dir, test=False, rand_rotate:float=0, rotate_dir=None):
     self.dataset = []
     self.test = test
     with open(index_path, 'r') as f:
       for line in f:
-        info = line.split()
-        id, obj, mat = info[0], info[1], info[2]
+        id = line.split()[0]
+        mat = os.path.join(str(rotate_dir if random.random() < rand_rotate else origin_dir), (id+'.mat'))
         if os.path.exists(mat): self.dataset.append((id, mat))
 
   def __getitem__(self, index):
@@ -72,8 +73,8 @@ class ShapeNetLoader:
     - test: 测试
   """
 
-  def __init__(self, index_file, batch_size, shuffle=False, test=False):
-    self.data_set = ShapeNetData(index_file,test)
+  def __init__(self, index_file, origin_dir, batch_size, shuffle=False, test=False, rand_rotate:float=0, rotate_dir=None):
+    self.data_set = ShapeNetData(index_file, origin_dir, test, rand_rotate, rotate_dir)
     self.batch_size = batch_size
     self.shuffle = shuffle
   

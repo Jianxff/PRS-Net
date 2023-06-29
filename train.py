@@ -24,7 +24,10 @@ n_epoch = 100 # epoch number
 # =================== init ===================
 prs_net = PRSNet().to(device)
 loss_fn = LossFn(weight = 50).to(device)
-data_loader = ShapeNetLoader('/root/autodl-tmp/shapenet.train',batch_size=batch_size,shuffle=True)
+data_loader = ShapeNetLoader(index_file='/root/autodl-tmp/shapenet.train',
+                             origin_dir='/root/autodl-tmp/shapenet/origin',
+                             rand_rotate=0.5, rotate_dir='/root/autodl-tmp/shapenet/rotate',
+                             batch_size=batch_size,shuffle=True)
 
 # Adam optimizer with learning rate 0.01
 optimizer = torch.optim.Adam(prs_net.parameters(), lr=0.01)

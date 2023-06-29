@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import random
 import scipy.io as sio
 from scipy.spatial.transform import Rotation
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -153,7 +152,7 @@ class Polygon:
     self.grid_size = grid_size
     self.bound = polygon_bound
 
-  def load_model(self, path, rand_rotate:float = 0):
+  def load_model(self, path, rand_rotate:bool=False):
     r""" Load model from file
 
     从文件中加载obj模型
@@ -169,7 +168,7 @@ class Polygon:
       self.sample_points = np.asarray(sample)
       if self.sample_points.shape[0] != 1000:
         return False
-      if random.random() < rand_rotate:
+      if rand_rotate:
         R = Rotation.random().as_matrix()
         self.vertices = (np.matmul(R, self.vertices.transpose())).transpose()
         self.sample_points = (np.matmul(R, self.sample_points.transpose())).transpose()
@@ -241,7 +240,7 @@ class Polygon:
     sio.savemat(path, data)
 
 
-  def process(self, path, rand_rotate:float):
+  def process(self, path, rand_rotate:bool):
     r""" Process model
     集成处理
     模型载入 + 体素化 + 最近点计算
