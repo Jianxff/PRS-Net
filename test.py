@@ -28,8 +28,8 @@ prs_net = PRSNet()
 loss_fn = LossFn(weight=50).to(device)
 data_loader = ShapeNetLoader(index_file='/root/autodl-tmp/shapenet.test',
                              origin_dir='/root/autodl-tmp/shapenet/origin',
-                             rand_rotate=0, rotate_dir='/root/autodl-tmp/shapenet/rotate',
-                             batch_size=1,shuffle=True)
+                             rand_rotate=0.5, rotate_dir='/root/autodl-tmp/shapenet/rotate',
+                             batch_size=1,shuffle=True,test=True)
 dataset = data_loader.dataset()
 
 # =============== load network ================
