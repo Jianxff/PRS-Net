@@ -19,26 +19,29 @@ train_tm = time.time()
 
 # =================== config ===================
 batch_size = 32 # batch size
+start_epoch = 0 # start epoch
 n_epoch = 100 # epoch number
 
 # =================== init ===================
 prs_net = PRSNet().to(device)
-loss_fn = LossFn(weight = 50).to(device)
+loss_fn = LossFn(weight = 25).to(device)
 data_loader = ShapeNetLoader(index_file='/root/autodl-tmp/shapenet.train',
-                             origin_dir='/root/autodl-tmp/shapenet/origin',
-                             rand_rotate=0.5, rotate_dir='/root/autodl-tmp/shapenet/rotate',
+                             origin_dir='/', #'/root/autodl-tmp/shapenet/origin',
+                             rand_rotate=1, rotate_dir='/root/autodl-tmp/shapenet/rotate',
                              batch_size=batch_size,shuffle=True)
+dataset = data_loader.dataset()
 
 # Adam optimizer with learning rate 0.01
 optimizer = torch.optim.Adam(prs_net.parameters(), lr=0.01)
+if start_epoch > 0: prs_net.load_network(f'epoch_{start_epoch // 10}0')
 
 # =================== train ===================
-for epoch in range(n_epoch + 1):
+for epoch in range(start_epoch, n_epoch + 1):
   epoch_tm = time.time()
   prs_net = prs_net.to(device)
   loss = None
   # ============ iterate over dataset =============
-  for i, data in enumerate(data_loader.dataset()):
+  for i, data in enumerate(dataset):
     iter_tm = time.time()
     data = ShapeNetData.auto_grad(data) # auto grad
 

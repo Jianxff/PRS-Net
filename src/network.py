@@ -1,4 +1,5 @@
 import torch
+import os
 import torch.nn as nn
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -89,6 +90,9 @@ class PRSNet(nn.Module):
 
   def load_network(self, label):
     path = f'checkpoint/prs_net_{label}.pth'
-    self.load_state_dict(torch.load(path))
+    if os.path.exists(path):
+      self.load_state_dict(torch.load(path))
+    else:
+      raise Exception(f'No such file {path}')
 
     

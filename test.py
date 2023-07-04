@@ -19,16 +19,16 @@ log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ========
 test_tm = time.time()
 
 # =================== config ===================
-limit = 500 # test model limit (*-1 for no limit)
+limit = 100 # test model limit (*-1 for no limit)
 save_dir = '/root/autodl-tmp/output' # output path
-load_label = 'epoch_80'
+load_label = 'latest'
 
 # =================== init ===================
 prs_net = PRSNet()
-loss_fn = LossFn(weight=50).to(device)
+loss_fn = LossFn(weight=25).to(device)
 data_loader = ShapeNetLoader(index_file='/root/autodl-tmp/shapenet.test',
                              origin_dir='/root/autodl-tmp/shapenet/origin',
-                             rand_rotate=0.5, rotate_dir='/root/autodl-tmp/shapenet/rotate',
+                             rand_rotate=1, rotate_dir='/root/autodl-tmp/shapenet/rotate',
                              batch_size=1,shuffle=True,test=True)
 dataset = data_loader.dataset()
 
@@ -50,6 +50,8 @@ for i, data in enumerate(dataset):
     'id': data['id'][0],
     'loss': loss.dump(),
     'vertices': data['vertices'].cpu().numpy()[0],
+    'triangles': data['triangles'].cpu().numpy()[0],
+    'voxel_grid': data['voxel_grid'].cpu().numpy()[0],
     'sample_points': data['sample_points'].detach().cpu().numpy()[0],
     'closest_points': data['closest_points'].detach().cpu().numpy()[0],
     'planes': [plane.detach().cpu().numpy() for plane in planes],

@@ -40,6 +40,7 @@ class ShapeNetData(Dataset):
       'id': id,
       'bound': data['bound'][0][0],
       'vertices': torch.Tensor(data['vertices']).to(device) if self.test else [],
+      'triangles': torch.Tensor(data['triangles']).to(device) if self.test else [],
       'grid_size': data['grid_size'][0][0],
       'sample_points': torch.Tensor(data['sample_points']).to(device),
       'voxel_grid': torch.Tensor(data['voxel_grid']).unsqueeze(0).to(device),

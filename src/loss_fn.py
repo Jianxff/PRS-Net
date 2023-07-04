@@ -2,6 +2,7 @@ import torch
 from torch import Tensor
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+cnt = 0
 
 def quat_muliply(q1: Tensor, q2: Tensor):
   r""" Quaternion multiplication
@@ -36,27 +37,39 @@ class DistCount(torch.autograd.Function):
   体素网格索引: [(Point + Bound) * GridSize] -> (3 * 3) int
   * 该部分参考了官方仓库实现
   """
-    
+
   @staticmethod
-  def closest(points: Tensor, polygon: dict):
+  def index(points: Tensor, polygon:dict):
+    r""" Get voxel grid index
+
+    获取体素网格索引
+    """
+    bound, grid_size = polygon['bound'][0], polygon['grid_size'][0]
+    indices = torch.floor((points + bound) * grid_size).long()
+    indices = torch.clamp(indices, min=0, max=grid_size-1).float()
+    w = torch.FloatTensor([grid_size**2, grid_size, 1]).to(device)
+    return torch.matmul(indices, w).long()
+
+
+  @staticmethod
+  def closest(indices: Tensor, polygon: dict):
     r""" Get closest points from polygon
     从多边形中获取最近的点
     """
-
     # get data
-    bound, grid_size = polygon['bound'][0], polygon['grid_size'][0]
-    closest_points = polygon['closest_points'].reshape(-1,grid_size,grid_size,grid_size,3)
-    # get indices
-    indices = torch.floor((points + bound) * grid_size).long()
-    indices = torch.clamp(indices, min=0, max=grid_size-1)
-    closest = torch.Tensor([]).to(device)
-    # get closest points from each batch of data
-    for batch in range(points.shape[0]):
-      cp, idx  = closest_points[batch,:], indices[batch,:]
-      clp = cp[idx[:,0], idx[:,1], idx[:,2]].unsqueeze(0)
-      closest = torch.cat((closest, clp), dim=0)
-      
-    return closest
+    grid_size = polygon['grid_size'][0]
+    closest_points = polygon['closest_points'].reshape(-1,grid_size**3,3)
+    return torch.gather(closest_points, 1, indices.unsqueeze(-1).repeat(1,1,3))
+
+  @staticmethod
+  def mask(indices: Tensor, polygon: dict):
+    r""" Get mask points from polygon
+
+    从多边形中获取掩码点
+    """
+    grid_size = polygon['grid_size'][0]
+    voxel_grid = polygon['voxel_grid'].reshape(-1,grid_size**3)
+    return torch.gather(voxel_grid, 1, indices)
   
 
   @staticmethod
@@ -64,15 +77,31 @@ class DistCount(torch.autograd.Function):
     r""" Forward propagation
     前向传播, 计算平均距离损失
     """
-    dist = (points - DistCount.closest(points, polygon))
+    idx = DistCount.index(points, polygon)
+    closest = DistCount.closest(idx, polygon)
+    mask = DistCount.mask(idx, polygon)
+    # calc number of 1 in mask
+    # num = torch.sum(mask, dim=1).to(device)
+
+    dist = (points - closest)  * (1 - mask).unsqueeze(-1).repeat(1,1,3)
+    
+
     # save for context
     ctx.constant = weight
     ctx.save_for_backward(dist)
 
     # return loss
     #### the norm_dist is not sqrt() in the official repo, provisionally keep the same here
-    norm_dist = torch.pow(dist, 2).to(device) - bias  
-    return torch.mean(torch.sum(norm_dist, dim=1)) * weight
+    dist2 = torch.pow(dist, 2).sum(2).to(device)
+    loss = torch.sum(dist2 - bias, dim=1)  
+
+    # with open('temp.txt', 'w') as f:
+    #   for i in range(mask.shape[1]):
+    #     f.write(f'{int(1 - mask[0][i])} -- {dist2[0][i]} -- [{points[0][i]}] -> [{closest[0][i]}]\n')
+
+    return torch.mean(loss) * weight
+  
+    
   
 
   @staticmethod
@@ -143,7 +172,7 @@ class SymmetryLoss(torch.nn.Module):
     theta = torch.where(theta > 180, 360 - theta, theta)
     # ======================================================================
 
-    return DistCount.apply(points_t, polygon, bias) + torch.reciprocal(theta).mean()
+    return DistCount.apply(points_t, polygon, bias) + torch.reciprocal(theta + 1e-12).mean()
 
   def __call__(self, polygon: dict, planes, axes):
     r""" Call function
@@ -199,7 +228,7 @@ class RegularLoss(torch.nn.Module):
     planes, axes = self.list_transpose(planes), self.list_transpose(axes)
     mat_I = torch.eye(3).unsqueeze(0).to(device)
     n_vec = planes[:,:,:-1]
-    n_vec = n_vec / torch.norm(n_vec, dim=2).unsqueeze(2)
+    n_vec = n_vec / (torch.norm(n_vec, dim=2).unsqueeze(2) + 1e-12)
     M1 = n_vec
     M1_T = torch.transpose(M1,1,2)
 
@@ -234,9 +263,9 @@ class Loss:
     }
 
   def __str__(self):
-    ref_str = f'ref: {self.ref_list[0].item():.3f} + {self.ref_list[1].item():.3f} + {self.ref_list[2].item():.3f}'
-    rot_str = f'rot: {self.rot_list[0].item():.3f} + {self.rot_list[1].item():.3f} + {self.rot_list[2].item():.3f}'
-    return f'loss: {self.all.item():.3f} <reg: {self.reg.item():3f}, {ref_str}, {rot_str}>'
+    ref_str = f'ref: {self.ref_list[0].item():.4f} + {self.ref_list[1].item():.4f} + {self.ref_list[2].item():.4f}'
+    rot_str = f'rot: {self.rot_list[0].item():.4f} + {self.rot_list[1].item():.4f} + {self.rot_list[2].item():.4f}'
+    return f'loss: {self.all.item():.4f} <reg: {self.reg.item():4f}, {ref_str}, {rot_str}>'
 
 
 
