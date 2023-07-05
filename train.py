@@ -20,19 +20,19 @@ train_tm = time.time()
 # =================== config ===================
 batch_size = 32 # batch size
 start_epoch = 0 # start epoch
-n_epoch = 100 # epoch number
+n_epoch = 200 # epoch number
 
 # =================== init ===================
 prs_net = PRSNet().to(device)
 loss_fn = LossFn(weight = 25).to(device)
 data_loader = ShapeNetLoader(index_file='/root/autodl-tmp/shapenet.train',
-                             origin_dir='/', #'/root/autodl-tmp/shapenet/origin',
-                             rand_rotate=1, rotate_dir='/root/autodl-tmp/shapenet/rotate',
-                             batch_size=batch_size,shuffle=True)
+                             origin_dir='/root/autodl-tmp/shapenet/origin',
+                             rotate_dir='/root/autodl-tmp/shapenet/rotate',
+                             rand_rotate=0.2, batch_size=batch_size,shuffle=True)
 dataset = data_loader.dataset()
 
 # Adam optimizer with learning rate 0.01
-optimizer = torch.optim.Adam(prs_net.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(prs_net.parameters(), lr=0.001)
 if start_epoch > 0: prs_net.load_network(f'epoch_{start_epoch // 10}0')
 
 # =================== train ===================

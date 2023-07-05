@@ -19,7 +19,7 @@ log(f'========== {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())} ========
 test_tm = time.time()
 
 # =================== config ===================
-limit = 100 # test model limit (*-1 for no limit)
+limit = 300 # test model limit (*-1 for no limit)
 save_dir = '/root/autodl-tmp/output' # output path
 load_label = 'latest'
 
@@ -28,7 +28,8 @@ prs_net = PRSNet()
 loss_fn = LossFn(weight=25).to(device)
 data_loader = ShapeNetLoader(index_file='/root/autodl-tmp/shapenet.test',
                              origin_dir='/root/autodl-tmp/shapenet/origin',
-                             rand_rotate=1, rotate_dir='/root/autodl-tmp/shapenet/rotate',
+                             rotate_dir='/root/autodl-tmp/shapenet/rotate',
+                             rand_rotate=0.5, 
                              batch_size=1,shuffle=True,test=True)
 dataset = data_loader.dataset()
 
